@@ -525,8 +525,8 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 	u8 *dst;
 	int byte_copied = 0;
 	int can_buf_done = 0;
-
-	mm_segment_t old_fs;
+	// todo:clean
+	//mm_segment_t old_fs;
 
 	int start_corr, len_copy;
 	start_corr = 0;
@@ -557,13 +557,13 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 		can_buf_done = 1;
 	}
 
-	if ( len_copy > 0 ) {
-		dst = buf->mem + offset;
+	if (len_copy > 0) {
+    dst = buf->mem + offset; // Kernel space buffer
+
 		if (offset + len_copy >= buf->length) {
 			len_copy = buf->length - offset;
 			can_buf_done = 1;
 		}
-
 		// Issue 12.
 		// Bug in use copy_to_user: sometime size, returned by user_addr_max() is smaller, then already exist pointer to buf from and to - because we
 		// in USER_DS segment.
@@ -575,10 +575,15 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 		// If anybody know more proper way - welcom.
 
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5, 9, 0)
-	if (!uaccess_kernel()) {
+	if (!in_task()) {
+        // If we're in kernel space, use memcpy
+        memcpy(dst, p, len_copy);
+    } else {
+        // In user space, use copy_to_user
+        byte_copied = copy_to_user((void __user *)dst, p, len_copy);
+    }
 #else
 		if (segment_eq(get_fs(), USER_DS)) {
-#endif
 			//printk_ratelimited(KERN_INFO "smi2021: WARNING !!! Issue 12. We on USER_DS segment. line=%d, buf->pos=%d, len_copy=%d", line, buf->pos, len_copy);
 			old_fs = get_fs();
 			set_fs(KERNEL_DS);
@@ -587,9 +592,11 @@ static void copy_video_block(struct smi2021 *smi2021, u8 *p, int size)
 		} else {
 			byte_copied = copy_to_user((unsigned long *)dst, (unsigned long *)p, (unsigned long )len_copy);
 		}
+#endif
 		if (byte_copied) {
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5 ,9, 0)
-			dev_warn(smi2021->dev, " Failed copy_to_user: USER_DS=%d len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d FROM=%lu, TO=%lu", uaccess_kernel(), len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length,  (long unsigned int )p, (long unsigned int )dst);
+			//dev_warn(smi2021->dev, " Failed copy_to_user: USER_DS=%d len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d FROM=%lu, TO=%lu", uaccess_kernel(), len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length,  (long unsigned int )p, (long unsigned int )dst);
+			dev_warn(smi2021->dev, " Failed memcpy: len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d FROM=%lu, TO=%lu", len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length, (unsigned long)p, (unsigned long)dst);
 #else
 			dev_warn(smi2021->dev, " Failed copy_to_user: USER_DS=%d len_copy=%d, not_copied=%d, line=%d, odd=%d, buf->pos=%d, offset=%d, buf->length=%d FROM=%lu, TO=%lu", segment_eq(get_fs(), USER_DS), len_copy, byte_copied, line, buf->odd, buf->pos, offset, buf->length,  (long unsigned int )p, (long unsigned int )dst);
 #endif
@@ -1233,8 +1240,8 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 	smi2021->i2c_adap = adap_template;
 
 	smi2021->i2c_adap.algo_data = smi2021;
-	strlcpy(smi2021->i2c_adap.name, "smi2021",
-				sizeof(smi2021->i2c_adap.name));
+	snprintf(smi2021->i2c_adap.name, sizeof(smi2021->i2c_adap.name), "smi2021");
+
 
 	i2c_set_adapdata(&smi2021->i2c_adap, &smi2021->v4l2_dev);
 
@@ -1264,8 +1271,8 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 		case SAA7113:
 			smi2021->saa7113_info.addr = 0x4a;
 			smi2021->saa7113_info.platform_data = &smi2021->saa7113_platform_data;
-			strlcpy(smi2021->saa7113_info.type, "saa7113",
-							sizeof(smi2021->saa7113_info.type));
+			snprintf(smi2021->saa7113_info.type, sizeof(smi2021->saa7113_info.type), "saa7113");
+
 
 			smi2021->gm7113c_subdev = v4l2_i2c_new_subdev_board(&smi2021->v4l2_dev,
 									&smi2021->i2c_adap,
@@ -1275,8 +1282,7 @@ static int smi2021_usb_probe(struct usb_interface *intf,
 		default:
 			smi2021->gm7113c_info.addr = 0x4a;
 			smi2021->gm7113c_info.platform_data = &smi2021->gm7113c_platform_data;
-			strlcpy(smi2021->gm7113c_info.type, "gm7113c",
-							sizeof(smi2021->gm7113c_info.type));
+			snprintf(smi2021->gm7113c_info.type, sizeof(smi2021->gm7113c_info.type), "gm7113c");
 
 			smi2021->gm7113c_subdev = v4l2_i2c_new_subdev_board(&smi2021->v4l2_dev,
 									&smi2021->i2c_adap,

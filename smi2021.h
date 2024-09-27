@@ -37,6 +37,7 @@
 #include <linux/i2c.h>
 #include <linux/slab.h>
 #include <linux/vmalloc.h>
+#include <linux/uaccess.h> 
 
 #include <media/v4l2-device.h>
 #include <media/v4l2-ioctl.h>

@@ -47,9 +47,9 @@ static int vidioc_querycap(struct file *file, void *priv,
 			struct v4l2_capability *cap)
 {
 	struct smi2021 *smi2021 = video_drvdata(file);
-
-	strlcpy(cap->driver, "smi2021", sizeof(cap->driver));
-	strlcpy(cap->card, "smi2021", sizeof(cap->card));
+	
+	snprintf(cap->driver, sizeof(cap->driver), "smi2021");
+	snprintf(cap->card, sizeof(cap->card), "smi2021");
 	usb_make_path(smi2021->udev, cap->bus_info, sizeof(cap->bus_info));
 	cap->device_caps = V4L2_CAP_VIDEO_CAPTURE |
 			   V4L2_CAP_STREAMING |
@@ -66,7 +66,7 @@ static int vidioc_enum_input(struct file *file, void *priv,
 	if (i->index >= smi2021->vid_input_count)
 		return -EINVAL;
 
-	strlcpy(i->name, smi2021->vid_inputs[i->index].name, sizeof(i->name));
+	snprintf(i->name, sizeof(i->name),smi2021->vid_inputs[i->index].name);
 	i->type = V4L2_INPUT_TYPE_CAMERA;
 	i->std = smi2021->vdev.tvnorms;
 	return 0;
@@ -78,8 +78,8 @@ static int vidioc_enum_fmt_vid_cap(struct file *file, void *priv,
 	if (f->index != 0)
 		return -EINVAL;
 
-	strlcpy(f->description, "16 bpp YUY2, 4:2:2, packed",
-					sizeof(f->description));
+	snprintf(f->description, sizeof(f->description), "16 bpp YUY2, 4:2:2, packed");
+
 	f->pixelformat = V4L2_PIX_FMT_UYVY;
 	return 0;
 }
